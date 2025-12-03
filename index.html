@@ -321,6 +321,38 @@ select.form-control {
   outline: var(--focus-outline);
 }
 
+/* Date picker icon styling - make calendar icon white */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-clear-button {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+/* For Firefox - use dark color scheme to get white icons */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+/* Ensure date picker icons are white in dark mode too */
+@media (prefers-color-scheme: dark) {
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: brightness(0) invert(1);
+  }
+  
+  input[type="date"]::-webkit-inner-spin-button,
+  input[type="date"]::-webkit-clear-button {
+    filter: brightness(0) invert(1);
+  }
+}
+
 .form-label {
   display: block;
   margin-bottom: var(--space-8);
@@ -339,10 +371,11 @@ select.form-control {
 .status {
   display: inline-flex;
   align-items: center;
-  padding: var(--space-6) var(--space-12);
+  padding: var(--space-2) var(--space-8);
   border-radius: var(--radius-full);
   font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
 }
 
 .status--success {
@@ -912,10 +945,7 @@ select.form-control {
   <div class="app-container">
     <header class="header">
       <div class="header-content">
-        <div class="logo">📊 Client Management System</div>
-        <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-          Bookkeeping Consultant Tool
-        </div>
+        <div class="logo">Clean Books</div>
       </div>
     </header>
 
@@ -944,9 +974,13 @@ select.form-control {
             <div class="stat-label">Onboarding</div>
             <div class="stat-value" id="onboarding">0</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-label">Archived</div>
+            <div class="stat-value" id="archivedClients">0</div>
+          </div>
         </div>
 
-        <div style="margin-bottom: var(--space-16);">
+        <div style="margin-bottom: var(--space-16); display: flex; gap: var(--space-12); align-items: center; flex-wrap: wrap;">
           <input 
             type="text" 
             class="form-control" 
@@ -955,6 +989,21 @@ select.form-control {
             oninput="filterClients()"
             style="max-width: 400px;"
           />
+          <select 
+            class="form-control" 
+            id="statusFilter"
+            onchange="filterClients()"
+            style="max-width: 200px;"
+          >
+            <option value="active">Active Clients</option>
+            <option value="archived">Archived Clients</option>
+            <option value="all">All Clients</option>
+          </select>
+          <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+            <span id="archivedCount" style="display: none;">
+              (<span id="archivedCountValue">0</span> archived)
+            </span>
+          </div>
         </div>
 
         <div class="clients-grid" id="clientsGrid">

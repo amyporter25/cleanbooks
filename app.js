@@ -209,17 +209,23 @@ function loadSampleData() {
   });
 }
 
-// Update statistics
+// Update statistics (now excludes archived clients)
 function updateStats() {
-  const total = clients.length;
-  const activeRetainers = clients.filter(c => c.status === 'Active Retainer').length;
-  const inCleanup = clients.filter(c => c.status === 'In Cleanup').length;
-  const onboarding = clients.filter(c => c.status === 'Onboarding').length;
+  const activeClients = clients.filter(c => c.status !== 'Archived');
+  const archivedClients = clients.filter(c => c.status === 'Archived');
+  const total = activeClients.length;
+  const activeRetainers = activeClients.filter(c => c.status === 'Active Retainer').length;
+  const inCleanup = activeClients.filter(c => c.status === 'In Cleanup').length;
+  const onboarding = activeClients.filter(c => c.status === 'Onboarding').length;
 
   document.getElementById('totalClients').textContent = total;
   document.getElementById('activeRetainers').textContent = activeRetainers;
   document.getElementById('inCleanup').textContent = inCleanup;
   document.getElementById('onboarding').textContent = onboarding;
+  const archivedEl = document.getElementById('archivedClients');
+  if (archivedEl) {
+    archivedEl.textContent = archivedClients.length;
+  }
 }
 
 // Render dashboard
@@ -228,10 +234,35 @@ function renderDashboard() {
   grid.innerHTML = '';
 
   const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-  const filteredClients = clients.filter(client => 
+  const statusFilter = document.getElementById('statusFilter')?.value || 'active';
+  
+  // Filter by status
+  let statusFilteredClients = clients;
+  if (statusFilter === 'active') {
+    statusFilteredClients = clients.filter(client => client.status !== 'Archived');
+  } else if (statusFilter === 'archived') {
+    statusFilteredClients = clients.filter(client => client.status === 'Archived');
+  }
+  // 'all' shows all clients
+  
+  // Filter by search term
+  const filteredClients = statusFilteredClients.filter(client => 
     client.businessName.toLowerCase().includes(searchTerm) ||
     client.ownerName.toLowerCase().includes(searchTerm)
   );
+  
+  // Update archived count display
+  const archivedCount = clients.filter(c => c.status === 'Archived').length;
+  const archivedCountEl = document.getElementById('archivedCount');
+  const archivedCountValueEl = document.getElementById('archivedCountValue');
+  if (archivedCountEl && archivedCountValueEl) {
+    if (statusFilter === 'active' && archivedCount > 0) {
+      archivedCountEl.style.display = 'inline';
+      archivedCountValueEl.textContent = archivedCount;
+    } else {
+      archivedCountEl.style.display = 'none';
+    }
+  }
 
   filteredClients.forEach(client => {
     const statusClass = getStatusClass(client.status);
@@ -278,6 +309,7 @@ function getStatusClass(status) {
     case 'Active Retainer': return 'status--success';
     case 'In Cleanup': return 'status--warning';
     case 'Onboarding': return 'status--info';
+    case 'Archived': return 'status--info';
     default: return 'status--info';
   }
 }
@@ -326,15 +358,29 @@ function renderClientDetail(client) {
           </span>
         </div>
       </div>
+      <div style="display: flex; gap: var(--space-8);">
+        ${client.status === 'Archived' ? `
+          <button class="btn btn--primary btn--sm" onclick="unarchiveClient(${client.id})" title="Restore client">
+            ↺ Unarchive
+          </button>
+        ` : `
+          <button class="btn btn--secondary btn--sm" onclick="archiveClient(${client.id})" title="Archive client">
+            📦 Archive
+          </button>
+        `}
+        <button class="btn btn--secondary btn--sm" onclick="deleteClient(${client.id})" title="Delete client" style="background: rgba(var(--color-error-rgb), 0.1); color: var(--color-error);">
+          🗑️ Delete
+        </button>
+      </div>
     </div>
 
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('overview')">Overview</button>
-      <button class="tab" onclick="switchTab('credentials')">Access Credentials</button>
-      <button class="tab" onclick="switchTab('documents')">Documents</button>
-      ${client.status === 'In Cleanup' || client.status === 'Onboarding' ? '<button class="tab" onclick="switchTab(\'cleanup\')">Cleanup Project</button>' : ''}
-      ${client.status === 'Active Retainer' ? '<button class="tab" onclick="switchTab(\'retainer\')">Monthly Retainer</button>' : ''}
-      <button class="tab" onclick="switchTab('timeline')">Timeline</button>
+      <button class="tab active" onclick="switchTab('overview', event)">Overview</button>
+      <button class="tab" onclick="switchTab('credentials', event)">Access Credentials</button>
+      <button class="tab" onclick="switchTab('documents', event)">Documents</button>
+      ${client.status === 'In Cleanup' || client.status === 'Onboarding' ? '<button class="tab" onclick="switchTab(\'cleanup\', event)">Cleanup Project</button>' : ''}
+      ${client.status === 'Active Retainer' ? '<button class="tab" onclick="switchTab(\'retainer\', event)">Monthly Retainer</button>' : ''}
+      <button class="tab" onclick="switchTab('timeline', event)">Timeline</button>
     </div>
 
     <div id="tabOverview" class="tab-content active">
@@ -808,14 +854,31 @@ function renderTimelineTab(client) {
 }
 
 // Switch tab
-function switchTab(tabName) {
+function switchTab(tabName, event) {
   currentTab = tabName;
   
   // Update tab buttons
   document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.remove('active');
   });
-  event.target.classList.add('active');
+  
+  // Find and activate the clicked tab button
+  if (event && event.target) {
+    event.target.classList.add('active');
+  } else {
+    // Fallback: find tab by text content
+    document.querySelectorAll('.tab').forEach(tab => {
+      const tabText = tab.textContent.trim().toLowerCase();
+      if ((tabName === 'overview' && tabText.includes('overview')) ||
+          (tabName === 'credentials' && tabText.includes('access')) ||
+          (tabName === 'documents' && tabText.includes('documents')) ||
+          (tabName === 'cleanup' && tabText.includes('cleanup')) ||
+          (tabName === 'retainer' && tabText.includes('retainer')) ||
+          (tabName === 'timeline' && tabText.includes('timeline'))) {
+        tab.classList.add('active');
+      }
+    });
+  }
   
   // Update tab content
   document.querySelectorAll('.tab-content').forEach(content => {
@@ -1027,6 +1090,47 @@ function updateMonthlyCloseNotes(clientId, catIndex, itemIndex, notes) {
   const client = clients.find(c => c.id === clientId);
   if (client) {
     client.monthlyClose[catIndex].items[itemIndex].notes = notes;
+  }
+}
+
+// Delete client
+function deleteClient(clientId) {
+  if (confirm('Are you sure you want to permanently delete this client? This action cannot be undone.')) {
+    clients = clients.filter(c => c.id !== clientId);
+    backToDashboard();
+    updateStats();
+    renderDashboard();
+  }
+}
+
+// Archive client
+function archiveClient(clientId) {
+  const client = clients.find(c => c.id === clientId);
+  if (client) {
+    if (confirm(`Archive ${client.businessName}? Archived clients will be hidden from the main dashboard but can be viewed using the filter.`)) {
+      const previousStatus = client.status;
+      client.status = 'Archived';
+      // Store previous status for potential restoration
+      if (!client.previousStatus) {
+        client.previousStatus = previousStatus;
+      }
+      backToDashboard();
+      updateStats();
+      renderDashboard();
+    }
+  }
+}
+
+// Unarchive client
+function unarchiveClient(clientId) {
+  const client = clients.find(c => c.id === clientId);
+  if (client) {
+    // Restore to previous status or default to 'Onboarding'
+    client.status = client.previousStatus || 'Onboarding';
+    delete client.previousStatus;
+    backToDashboard();
+    updateStats();
+    renderDashboard();
   }
 }
 
